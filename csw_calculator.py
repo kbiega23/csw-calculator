@@ -1,4 +1,53 @@
-import streamlit as st
+# Technical details expander
+    with st.expander("🔍 Calculation Details & Debug Information"):
+        st.markdown(f"""
+        **Location & Weather Data:**
+        - Selected Location: {st.session_state.form_data['city']}, {st.session_state.form_data['state']}
+        - Weather Data Source: {results.get('city_used', 'Unknown')}
+        - Climate Data: {results['hdd']:,} HDD, {results['cdd']:,} CDD
+        
+        **Building Configuration:**
+        - Building Classification: {'Large' if st.session_state.form_data['floor_area'] >= 200000 else 'Mid'}-size {st.session_state.form_data['building_type']}
+        - Lookup Configuration ID: `{results['lookup_key']}`
+        - Floor Area: {st.session_state.form_data['floor_area']:,} SF
+        - Window Area: {st.session_state.form_data['window_area']:,} SF
+        - Operating Hours: {st.session_state.form_data['operation_hours']:,} hours/year
+        
+        **Calculation Coefficients Used:**
+        - Heating: a={results.get('coefficients_used', {}).get('heat_a', 0):.4f}, b={results.get('coefficients_used', {}).get('heat_b', 0):.8f}, c={results.get('coefficients_used', {}).get('heat_c', 0):.12f}
+        - Cooling: a={results.get('coefficients_used', {}).get('cool_a', 0):.4f}, b={results.get('coefficients_used', {}).get('cool_b', 0):.8f}, c={results.get('coefficients_used', {}).get('cool_c', 0):.12f}
+        - Gas: a={results.get('coefficients_used', {}).get('gas_a', 0):.4f}, b={results.get('coefficients_used', {}).get('gas_b', 0):.8f}, c={results.get('coefficients_used', {}).get('gas_c', 0):.12f}
+        
+        **Energy Calculations:**
+        - Heating Savings per SF: {results['heating_kwh']/st.session_state.form_data['window_area']:.4f} kWh/SF
+        - Cooling Savings per SF: {results['cooling_kwh']/st.session_state.form_data['window_area']:.4f} kWh/SF
+        - Gas Savings per SF: {results['gas_therms']/st.session_state.form_data['window_area']:.4f} therms/SF
+        - Total Heating Savings: {results['heating_kwh']:,.0f} kWh/year
+        - Total Cooling Savings: {results['cooling_kwh']:,.0f} kWh/year  
+        - Total Gas Savings: {results['gas_therms']:,.1f} therms/year
+        - Total Energy Intensity Savings: {results['energy_intensity_savings']:.1f} kBtu/SF/year
+        
+        **Cost Analysis:**
+        - Electric Cost Savings: ${results['electric_cost']:,.0f}/year (@ ${st.session_state.form_data['electric_rate']:.3f}/kWh)
+        - Gas Cost Savings: ${results['gas_cost']:,.0f}/year (@ ${st.session_state.form_data['gas_rate']:.2f}/therm)
+        - Total Annual Savings: ${results['total_cost']:,.0f}/year
+        - Savings per Square Foot: ${results['cost_per_sf']:.2f}/SF/year
+        
+        **Validation Notes:**
+        - {"✅ Weather data found for selected city" if results.get('city_used') == st.session_state.form_data['city'] else "⚠️ Using weather data approximation"}
+        - {"✅ Exact coefficient match found" if not results['lookup_key'].startswith('FALLBACK') else "⚠️ Using fallback coefficients - results may be approximate"}
+        """)
+        
+        # Show comparison with typical ranges
+        if results['total_cost'] > 0:
+            cost_per_window_sf = results['total_cost'] / st.session_state.form_data['window_area']
+            st.markdown(f"""
+            **Reasonableness Check:**
+            - Cost savings per window SF: ${cost_per_window_sf:.2f}/SF/year
+            - Typical range: $2-8/SF/year for secondary windows
+            - {"✅ Within expected range" if 2 <= cost_per_window_sf <= 8 else "⚠️ Outside typical range - please verify inputs"}
+            """)
+    import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
@@ -7,7 +56,7 @@ from datetime import datetime
 
 # Page configuration
 st.set_page_config(
-    page_title="Winsert Savings Calculator",
+    page_title="Commercial Secondary Windows Savings Calculator",
     page_icon="🏢",
     layout="wide",
     initial_sidebar_state="collapsed"
@@ -317,8 +366,13 @@ def create_lookup_key(form_data):
     # Building type
     building_type = form_data['building_type']
     
-    # Fuel type
-    fuel_code = form_data['heating_fuel'].replace(" ", "")
+    # Fuel type - fix the mapping
+    fuel_mapping = {
+        "Electric": "Electric",
+        "Natural Gas": "NaturalGas",  # Remove space for lookup key
+        "Electric Only": "Electric"
+    }
+    fuel_code = fuel_mapping.get(form_data['heating_fuel'], "NaturalGas")
     
     # Operating hours
     hours = form_data['operation_hours']
@@ -332,53 +386,122 @@ def calculate_savings():
     """Calculate energy savings using real Excel formulas"""
     form_data = st.session_state.form_data
     
-    # Get weather data
+    # Get weather data - fix city name matching
     city = form_data['city']
-    weather = WEATHER_DATA.get(city, {"HDD": 4000, "CDD": 1000})
+    
+    # Debug: Check if city exists in weather data
+    if city not in WEATHER_DATA:
+        # Try common variations
+        city_variations = [
+            city,
+            city.replace(" ", ""),
+            city.replace(".", ""),
+            city + " " + form_data['state'][:2].upper()  # Add state abbreviation
+        ]
+        
+        found_city = None
+        for variation in city_variations:
+            if variation in WEATHER_DATA:
+                found_city = variation
+                break
+        
+        if found_city:
+            city = found_city
+        else:
+            # Use state defaults if city not found
+            state_defaults = {
+                "New York": {"HDD": 4885, "CDD": 1133},
+                "California": {"HDD": 1283, "CDD": 617}, 
+                "Illinois": {"HDD": 6399, "CDD": 830},
+                "Texas": {"HDD": 2333, "CDD": 2678},
+                "Florida": {"HDD": 150, "CDD": 4292}
+            }
+            weather = state_defaults.get(form_data['state'], {"HDD": 4000, "CDD": 1000})
+            city = f"Default_{form_data['state']}"
+    
+    if city in WEATHER_DATA:
+        weather = WEATHER_DATA[city]
+    else:
+        weather = {"HDD": 4000, "CDD": 1000}  # Final fallback
+    
     hdd, cdd = weather["HDD"], weather["CDD"]
     
     # Create lookup key
     lookup_key = create_lookup_key(form_data)
     
-    # Get coefficients (with fallback)
+    # Get coefficients - improved lookup with better fallbacks
     coefficients = SAVINGS_COEFFICIENTS.get(lookup_key)
     
-    # If exact match not found, try similar configurations
+    # If exact match not found, try simplified lookup
     if not coefficients:
-        # Fallback logic - find similar configuration
-        fallback_key = "SingleSingleLargeOfficeVAVNatural Gas4000"
-        coefficients = SAVINGS_COEFFICIENTS.get(fallback_key, {
-            "heat_a": 0, "heat_b": 0, "heat_c": 0,
-            "cool_a": 5.0, "cool_b": 0.001, "cool_c": -0.0000001,
-            "gas_a": 0.5, "gas_b": 0.0001, "gas_c": 0
-        })
+        # Try different variations of the lookup key
+        simplified_keys = []
+        
+        # Basic patterns to try
+        building_size = "Large" if form_data['floor_area'] >= 200000 else "Mid"
+        existing_type = "Single" if "Single" in form_data['existing_window_type'] else "Double"
+        secondary_type = form_data['secondary_window_type']
+        
+        # Try common configurations
+        if form_data['heating_fuel'] == "Natural Gas":
+            simplified_keys.extend([
+                f"SingleSingle{building_size}OfficePVAV_GasNaturalGas{form_data['operation_hours']}",
+                f"SingleSingle{building_size}OfficeVAVNaturalGas{form_data['operation_hours']}",
+                f"SingleSingleLargeOfficeVAVNaturalGas4000"  # Common fallback
+            ])
+        else:
+            simplified_keys.extend([
+                f"SingleSingle{building_size}OfficePVAV_ElecElectric{form_data['operation_hours']}",
+                f"SingleSingle{building_size}OfficeVAVElectric{form_data['operation_hours']}"
+            ])
+        
+        # Try each simplified key
+        for key in simplified_keys:
+            if key in SAVINGS_COEFFICIENTS:
+                coefficients = SAVINGS_COEFFICIENTS[key]
+                lookup_key = key  # Update for debugging
+                break
+    
+    # Final fallback with more reasonable coefficients
+    if not coefficients:
+        # Use scaled coefficients based on building size and type
+        base_cool = 3.0 if form_data['floor_area'] < 200000 else 5.0
+        base_heat = 1.0 if form_data['heating_fuel'] == "Electric" else 0
+        base_gas = 0.5 if form_data['heating_fuel'] == "Natural Gas" else 0
+        
+        coefficients = {
+            "heat_a": base_heat, "heat_b": 0.001, "heat_c": -0.0000001,
+            "cool_a": base_cool, "cool_b": 0.001, "cool_c": -0.0000001,
+            "gas_a": base_gas, "gas_b": 0.0001, "gas_c": 0
+        }
+        lookup_key = "FALLBACK_REASONABLE"
     
     # Calculate using regression equations: savings = a + b*x + c*x^2
     # Where x is HDD for heating, CDD for cooling
     
     # Heating savings (kWh/SF of window)
-    heating_kwh_per_sf = (coefficients["heat_a"] + 
-                         coefficients["heat_b"] * hdd + 
-                         coefficients["heat_c"] * hdd * hdd)
+    heating_kwh_per_sf = max(0, (coefficients["heat_a"] + 
+                                coefficients["heat_b"] * hdd + 
+                                coefficients["heat_c"] * hdd * hdd))
     
     # Cooling savings (kWh/SF of window) 
-    cooling_kwh_per_sf = (coefficients["cool_a"] + 
-                         coefficients["cool_b"] * cdd + 
-                         coefficients["cool_c"] * cdd * cdd)
+    cooling_kwh_per_sf = max(0, (coefficients["cool_a"] + 
+                                coefficients["cool_b"] * cdd + 
+                                coefficients["cool_c"] * cdd * cdd))
     
     # Gas savings (therms/SF of window)
-    gas_therms_per_sf = (coefficients["gas_a"] + 
-                        coefficients["gas_b"] * hdd + 
-                        coefficients["gas_c"] * hdd * hdd)
+    gas_therms_per_sf = max(0, (coefficients["gas_a"] + 
+                               coefficients["gas_b"] * hdd + 
+                               coefficients["gas_c"] * hdd * hdd))
     
     # Total savings for window area
     window_area = form_data['window_area']
     
-    total_heating_kwh = max(0, heating_kwh_per_sf * window_area)
-    total_cooling_kwh = max(0, cooling_kwh_per_sf * window_area)
+    total_heating_kwh = heating_kwh_per_sf * window_area
+    total_cooling_kwh = cooling_kwh_per_sf * window_area
     total_kwh = total_heating_kwh + total_cooling_kwh
     
-    total_gas_therms = max(0, gas_therms_per_sf * window_area)
+    total_gas_therms = gas_therms_per_sf * window_area
     
     # Cost savings
     electric_cost = total_kwh * form_data['electric_rate']
@@ -420,11 +543,13 @@ def calculate_savings():
         'energy_intensity_savings': energy_intensity_savings,
         'percentage_savings': percentage_savings,
         'baseline_eui': baseline_eui,
-        'lookup_key': lookup_key
+        'lookup_key': lookup_key,
+        'city_used': city,  # For debugging
+        'coefficients_used': coefficients  # For debugging
     }
 
 # Main header
-st.markdown('<div class="main-header">🏢 Winsert Savings Calculator</div>', unsafe_allow_html=True)
+st.markdown('<div class="main-header">🏢 Commercial Secondary Windows Savings Calculator</div>', unsafe_allow_html=True)
 
 # Show progress
 show_progress(st.session_state.step)
@@ -1085,12 +1210,10 @@ if st.session_state.step < 8:
     st.markdown(
         """
         <div style='text-align: center; color: #666; padding: 20px;'>
-            <p><strong>Winsert Savings Calculator v2.0.0</strong></p>
+            <p><strong>Commercial Secondary Windows Savings Calculator v2.0.0</strong></p>
             <p>🔒 Your information is secure and will only be used to provide you with energy savings estimates and product information.</p>
             <p>Questions? Contact us at <a href="mailto:support@company.com">support@company.com</a></p>
         </div>
         """, 
         unsafe_allow_html=True
     )
-
-
