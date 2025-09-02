@@ -7,7 +7,7 @@ from datetime import datetime
 
 # Page configuration
 st.set_page_config(
-    page_title="Commercial Secondary Windows Savings Calculator",
+    page_title="Winsert Savings Calculator",
     page_icon="🏢",
     layout="wide",
     initial_sidebar_state="collapsed"
@@ -424,7 +424,7 @@ def calculate_savings():
     }
 
 # Main header
-st.markdown('<div class="main-header">🏢 Commercial Secondary Windows Savings Calculator</div>', unsafe_allow_html=True)
+st.markdown('<div class="main-header">🏢 Winsert Savings Calculator</div>', unsafe_allow_html=True)
 
 # Show progress
 show_progress(st.session_state.step)
@@ -1085,11 +1085,12 @@ if st.session_state.step < 8:
     st.markdown(
         """
         <div style='text-align: center; color: #666; padding: 20px;'>
-            <p><strong>Commercial Secondary Windows Savings Calculator v2.0.0</strong></p>
+            <p><strong>Winsert Savings Calculator v2.0.0</strong></p>
             <p>🔒 Your information is secure and will only be used to provide you with energy savings estimates and product information.</p>
             <p>Questions? Contact us at <a href="mailto:support@company.com">support@company.com</a></p>
         </div>
         """, 
         unsafe_allow_html=True
     )
+
 
