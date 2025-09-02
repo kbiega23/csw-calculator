@@ -259,7 +259,7 @@ def navigate_step(direction):
     elif direction == "prev":
         st.session_state.step -= 1
     
-    st.experimental_rerun()
+    st.rerun()
 
 def validate_current_step():
     """Validate required fields for current step"""
@@ -575,7 +575,7 @@ elif st.session_state.step == 3:
                     help=f"Select if your building is a {building_type.lower()}"
                 ):
                     st.session_state.form_data['building_type'] = building_type
-                    st.experimental_rerun()
+                    st.rerun()
         
         if selected_building:
             st.success(f"✅ Selected: **{selected_building}**")
@@ -1075,7 +1075,7 @@ with col2:
             # Reset all session state
             st.session_state.step = 1
             st.session_state.form_data = {}
-            st.experimental_rerun()
+            st.rerun()
 
 st.markdown('</div>', unsafe_allow_html=True)
 
@@ -1092,3 +1092,4 @@ if st.session_state.step < 8:
         """, 
         unsafe_allow_html=True
     )
+
