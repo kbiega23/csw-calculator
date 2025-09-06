@@ -1319,4 +1319,5 @@ if st.session_state.step < 8:
     "SingleDoubleMidOfficePVAV_GasNatural Gas2912": {"heat_kwh_sf": 0, "cool_kwh_sf": 7.99, "gas_therms_sf": 0.5},
     "SingleDoubleMidOfficePVAV_GasNatural Gas8760": {"heat_kwh_sf": 0, "cool_kwh_sf": 13.29, "gas_therms_sf": 1.38},
     "DoubleSingleMidOfficePVAV_GasNatural Gas2080": {"heat_kwh_sf": 0, "cool_kwh_sf": 2.11, "gas_therms_sf": 0.17},
-    "DoubleSingleM
+    "DoubleSingleMidOfficePVAV_GasNatural Gas2912": {"heat_kwh_sf": 0, "cool_kwh_sf": 3.1, "gas_therms_sf": 0.22},
+    "DoubleSingleMidOfficePVAV_GasNatural Gas8760": {"heat_kwh_sf": 0, "cool_kwh_sf": 5.15, "gas_therms_sf": 0.64},
